@@ -5,7 +5,7 @@ create table if not exists public.publications (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique,
   title text not null,
-  kind text not null check (kind in ('publication','book','newsletter','site','other')),
+  kind text not null check (kind in ('publication','book','newsletter','site','course','other')),
   canonical_url text,
   status text not null default 'active',
   metadata jsonb not null default '{}'::jsonb,
@@ -18,7 +18,7 @@ create table if not exists public.content_items (
   publication_id uuid not null references public.publications(id) on delete cascade,
   slug text not null,
   title text not null,
-  content_type text not null check (content_type in ('article','note','social_post','video','book','chapter','other')),
+  content_type text not null check (content_type in ('article','note','social_post','video','book','chapter','course','other')),
   canonical_url text,
   topic text,
   perspective text,
@@ -112,7 +112,8 @@ alter table public.outcomes enable row level security;
 insert into public.publications (slug, title, kind, canonical_url, status)
 values
   ('branchpoint', 'Branchpoint', 'publication', 'https://branchpoint.space', 'active'),
-  ('architecting-intelligence', 'Architecting Intelligence', 'book', null, 'active')
+  ('architecting-intelligence', 'Architecting Intelligence', 'book', null, 'active'),
+  ('zdx-binary-academy', 'ZeroDriveX Binary Academy', 'site', 'https://binary.zdxai.us', 'active')
 on conflict (slug) do update set
   title = excluded.title,
   kind = excluded.kind,
@@ -161,3 +162,39 @@ where p.slug = 'branchpoint'
       and m.platform = 'substack'
       and (m.metadata ->> 'baseline') = 'true'
   );
+
+
+insert into public.content_items (
+  publication_id, slug, title, content_type, canonical_url, topic, perspective, status, published_at, metadata
+)
+select
+  p.id,
+  'understanding-apple-mach-o-binary-internals',
+  'Understanding Apple Mach-O Binary Internals',
+  'course',
+  'https://binary.zdxai.us',
+  'Binary analysis · Apple Mach-O · Software internals',
+  'Technical course product tracked alongside publications and books for acquisition attribution.',
+  'published',
+  now(),
+  jsonb_build_object('price_cents', 4999, 'currency', 'USD')
+from public.publications p
+where p.slug = 'zdx-binary-academy'
+on conflict (publication_id, slug) do update set
+  title = excluded.title,
+  content_type = excluded.content_type,
+  canonical_url = excluded.canonical_url,
+  topic = excluded.topic,
+  perspective = excluded.perspective,
+  status = excluded.status,
+  metadata = excluded.metadata,
+  updated_at = now();
+
+update public.publications
+set metadata = jsonb_build_object(
+  'lifetime_pass_cents', 7999,
+  'currency', 'USD',
+  'lifetime_pass_note', 'Lifetime access to current and future courses'
+),
+updated_at = now()
+where slug = 'zdx-binary-academy';
